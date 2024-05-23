@@ -1,1 +1,1 @@
-[Task {taskId = 1, description = "Proyecto 1", category = "Escolar", createdAt = Just 2024-5-21 12:0:0, dueDate = Just 2024-6-3 9:0:0, priority = High}]
+[Task {taskId = 1, description = "Proyecto Mayolo", category = "Escolar", createdAt = Just (MyUTCTime {year = 2024, month = 5, day = 21, hour = 12, minute = 0, second = 0}), priority = High},Task {taskId = 2, description = "Proyecto Grimaldo ", category = "Escolar", createdAt = Just (MyUTCTime {year = 2024, month = 5, day = 21, hour = 12, minute = 0, second = 0}), priority = Medium}]
