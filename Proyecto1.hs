@@ -9,7 +9,10 @@ data MyUTCTime = MyUTCTime
     , hour :: Int      -- Hora
     , minute :: Int    -- Minuto
     , second :: Int    -- Segundo
-    } deriving (Show, Read) -- Deriva las instancias de Show y Read para impresión y lectura
+    } deriving (Eq, Read) -- Deriva las instancias de Eq y Read
+
+instance Show MyUTCTime where
+    show (MyUTCTime y m d h mi s) = show y ++ "-" ++ show m ++ "-" ++ show d ++ " " ++ show h ++ ":" ++ show mi ++ ":" ++ show s
 
 -- Función para obtener la fecha y hora actual (simulada)
 getCurrentTime :: IO MyUTCTime
@@ -24,6 +27,7 @@ data Task = Task
     , description :: String        -- Descripción de la tarea
     , category :: String           -- Categoría de la tarea
     , createdAt :: Maybe MyUTCTime -- Fecha de creación de la tarea (puede ser Nothing si no se especifica)
+    , dueDate :: Maybe MyUTCTime   -- Fecha de vencimiento de la tarea (puede ser Nothing si no se especifica)
     , priority :: Priority         -- Prioridad de la tarea
     } deriving (Show, Read)        -- Deriva las instancias de Show y Read
 
@@ -60,7 +64,8 @@ addTask tasks = do
     category <- getLine                 -- Lee la categoría
     priority <- getPriority             -- Solicita la prioridad de la tarea
     currentTime <- getCurrentTime       -- Obtiene la hora y fecha actual
-    let task = Task (generateTaskId tasks) description category (Just currentTime) priority -- Crea una nueva tarea
+    dueDate <- getDueDate               -- Solicita la fecha de vencimiento de la tarea
+    let task = Task (generateTaskId tasks) description category (Just currentTime) dueDate priority -- Crea una nueva tarea
     putStrLn "Task added successfully." -- Informa que la tarea fue agregada con éxito
     mainMenu (tasks ++ [task])          -- Agrega la tarea a la lista y vuelve al menú principal
 
@@ -76,6 +81,32 @@ getPriority = do
         _ -> do                                          -- Si la entrada no es válida:
             putStrLn "Invalid priority. Please enter Low, Medium, or High."
             getPriority                                  -- Solicita nuevamente la prioridad
+
+-- Función para obtener la fecha de vencimiento de la tarea del usuario
+getDueDate :: IO (Maybe MyUTCTime)
+getDueDate = do
+    putStrLn "Do you want to set a due date for this task? (yes/no): " -- Pregunta si desea establecer una fecha de vencimiento
+    answer <- getLine
+    case answer of
+        "yes" -> do
+            putStrLn "Enter year: "
+            yearStr <- getLine
+            putStrLn "Enter month: "
+            monthStr <- getLine
+            putStrLn "Enter day: "
+            dayStr <- getLine
+            putStrLn "Enter hour: "
+            hourStr <- getLine
+            putStrLn "Enter minute: "
+            minuteStr <- getLine
+            putStrLn "Enter second: "
+            secondStr <- getLine
+            let dueDate = MyUTCTime (read yearStr) (read monthStr) (read dayStr) (read hourStr) (read minuteStr) (read secondStr)
+            return (Just dueDate)
+        "no" -> return Nothing
+        _ -> do
+            putStrLn "Invalid input. Please enter 'yes' or 'no'."
+            getDueDate
 
 -- Función para generar un nuevo ID de tarea
 generateTaskId :: TaskList -> Int
@@ -111,8 +142,11 @@ listTasks tasks = do
 
 -- Función para imprimir una tarea
 printTask :: Task -> IO ()
-printTask task = putStrLn $ show (taskId task) ++ ". " ++ description task ++ " [" ++ show (priority task) ++ "]"
-    -- Imprime la tarea en el formato: "ID. Descripción [Prioridad]"
+printTask task = putStrLn $ show (taskId task) ++ ". " ++ description task ++ " [" ++ show (priority task) ++ "]" ++ dueDateString
+    where
+        dueDateString = case dueDate task of
+            Nothing -> ""
+            Just dt -> " Due: " ++ show dt
 
 -- Función para verificar si un archivo existe
 doesFileExist :: FilePath -> IO Bool
@@ -129,7 +163,7 @@ readFileSafe path = try (readFile path) -- Intenta leer el archivo y maneja posi
 
 -- Función para escribir un archivo de manera segura
 writeFileSafe :: FilePath -> String -> IO (Either SomeException ())
-writeFileSafe path content = try (writeFile path content) -- Intenta escribir el archivo y maneja posibles excepciones
+writeFileSafe path content = try (withFile path WriteMode (\handle -> hPutStr handle content)) -- Intenta escribir el archivo y maneja posibles excepciones
 
 -- Función para cargar las tareas desde un archivo
 loadTasks :: IO TaskList
@@ -166,3 +200,5 @@ main = do
     tasks <- loadTasks -- Carga las tareas desde el archivo
     putStrLn "Welcome to the Haskell To-Do List Manager" -- Imprime un mensaje de bienvenida
     mainMenu tasks -- Muestra el menú principal
+
+
