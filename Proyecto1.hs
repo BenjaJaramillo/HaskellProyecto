@@ -1,168 +1,185 @@
 import System.IO
-import Control.Exception (try, SomeException) -- Importa el módulo para manejar excepciones
+import Control.Exception (try, SomeException)
 
--- Define un tipo de dato simple para representar la fecha y hora
 data MyUTCTime = MyUTCTime
-    { year :: Int      -- Año
-    , month :: Int     -- Mes
-    , day :: Int       -- Día
-    , hour :: Int      -- Hora
-    , minute :: Int    -- Minuto
-    , second :: Int    -- Segundo
-    } deriving (Show, Read) -- Deriva las instancias de Show y Read para impresión y lectura
+    { year :: Int
+    , month :: Int
+    , day :: Int
+    , hour :: Int
+    , minute :: Int
+    , second :: Int
+    } deriving (Show, Read)
 
--- Función para obtener la fecha y hora actual (simulada)
 getCurrentTime :: IO MyUTCTime
-getCurrentTime = do
-    -- Esta función debería obtener la fecha y hora real del sistema
-    -- Aquí simulamos con una fecha fija para simplicidad
-    return $ MyUTCTime 2024 5 21 12 0 0
+getCurrentTime = return $ MyUTCTime 2024 5 21 12 0 0
 
--- Define el tipo de dato 'Task' para representar una tarea
 data Task = Task
-    { taskId :: Int                -- ID de la tarea
-    , description :: String        -- Descripción de la tarea
-    , category :: String           -- Categoría de la tarea
-    , createdAt :: Maybe MyUTCTime -- Fecha de creación de la tarea (puede ser Nothing si no se especifica)
-    , priority :: Priority         -- Prioridad de la tarea
-    } deriving (Show, Read)        -- Deriva las instancias de Show y Read
+    { taskId :: Int
+    , description :: String
+    , category :: String
+    , createdAt :: Maybe MyUTCTime
+    , dueDate :: Maybe (Int, Int, Int)  -- Fecha de vencimiento como (Año, Mes, Día)
+    , priority :: Priority
+    } deriving (Show, Read)
 
-type TaskList = [Task] -- Alias para una lista de tareas
+type TaskList = [Task]
 
-data Priority = Low | Medium | High deriving (Show, Read) -- Prioridad puede ser Baja, Media o Alta
+data Priority = Low | Medium | High deriving (Show, Read)
 
--- Función para mostrar el menú principal
 mainMenu :: TaskList -> IO ()
 mainMenu tasks = do
-    putStrLn "\nMain Menu:"       -- Imprime el menú principal
-    putStrLn "1. Add a task"      -- Opción para agregar una tarea
-    putStrLn "2. Delete a task"   -- Opción para eliminar una tarea
-    putStrLn "3. List all tasks"  -- Opción para listar todas las tareas
-    putStrLn "4. Exit"            -- Opción para salir
-    putStr "Choose an option: "   -- Solicita una opción al usuario
-    hFlush stdout                 -- Asegura que la salida se imprima inmediatamente
-    option <- getLine             -- Lee la opción del usuario
+    putStrLn "\nMain Menu:"
+    putStrLn "1. Add a task"
+    putStrLn "2. Delete a task"
+    putStrLn "3. List all tasks"
+    putStrLn "4. Exit"
+    putStr "Choose an option: "
+    hFlush stdout
+    option <- getLine
     case option of
-        "1" -> addTask tasks      -- Llama a 'addTask' si la opción es 1
-        "2" -> deleteTask tasks   -- Llama a 'deleteTask' si la opción es 2
-        "3" -> listTasks tasks    -- Llama a 'listTasks' si la opción es 3
-        "4" -> saveTasks tasks    -- Llama a 'saveTasks' si la opción es 4
-        _   -> do                 -- Si la opción no es válida:
+        "1" -> addTask tasks
+        "2" -> deleteTask tasks
+        "3" -> listTasks tasks
+        "4" -> saveTasks tasks
+        _   -> do
             putStrLn "Invalid option, please try again."
-            mainMenu tasks        -- Vuelve a mostrar el menú principal
+            mainMenu tasks
 
--- Función para agregar una tarea
 addTask :: TaskList -> IO ()
 addTask tasks = do
-    putStrLn "Enter task description: " -- Solicita la descripción de la tarea
-    description <- getLine              -- Lee la descripción
-    putStrLn "Enter task category: "    -- Solicita la categoría de la tarea
-    category <- getLine                 -- Lee la categoría
-    priority <- getPriority             -- Solicita la prioridad de la tarea
-    currentTime <- getCurrentTime       -- Obtiene la hora y fecha actual
-    let task = Task (generateTaskId tasks) description category (Just currentTime) priority -- Crea una nueva tarea
-    putStrLn "Task added successfully." -- Informa que la tarea fue agregada con éxito
-    mainMenu (tasks ++ [task])          -- Agrega la tarea a la lista y vuelve al menú principal
+    putStrLn "Enter task description:"
+    description <- getLine
+    putStrLn "Enter task category:"
+    category <- getLine
+    priority <- getPriority
+    currentTime <- getCurrentTime
+    dueDate <- getDueDate
+    let task = Task (generateTaskId tasks) description category (Just currentTime) dueDate priority
+    putStrLn "Task added successfully."
+    mainMenu (tasks ++ [task])
 
--- Función para obtener la prioridad de la tarea del usuario
 getPriority :: IO Priority
 getPriority = do
-    putStrLn "Enter task priority (Low, Medium, High): " -- Solicita la prioridad de la tarea
-    priorityStr <- getLine                               -- Lee la prioridad
+    putStrLn "Enter task priority (Low, Medium, High):"
+    priorityStr <- getLine
     case priorityStr of
-        "Low" -> return Low                              -- Devuelve 'Low' si la entrada es "Low"
-        "Medium" -> return Medium                        -- Devuelve 'Medium' si la entrada es "Medium"
-        "High" -> return High                            -- Devuelve 'High' si la entrada es "High"
-        _ -> do                                          -- Si la entrada no es válida:
+        "Low" -> return Low
+        "Medium" -> return Medium
+        "High" -> return High
+        _ -> do
             putStrLn "Invalid priority. Please enter Low, Medium, or High."
-            getPriority                                  -- Solicita nuevamente la prioridad
+            getPriority
 
--- Función para generar un nuevo ID de tarea
+getDueDate :: IO (Maybe (Int, Int, Int))
+getDueDate = do
+    putStrLn "Enter due date (YYYY-MM-DD):"
+    dateStr <- getLine
+    case parseDate dateStr of
+        Just (year, month, day) -> return $ Just (year, month, day)
+        Nothing -> do
+            putStrLn "Invalid date format. Please enter date in YYYY-MM-DD format."
+            getDueDate
+
+parseDate :: String -> Maybe (Int, Int, Int)
+parseDate str =
+    case splitDate str of
+        [yearStr, monthStr, dayStr] ->
+            case (readMaybe yearStr, readMaybe monthStr, readMaybe dayStr) of
+                (Just year, Just month, Just day) -> Just (year, month, day)
+                _ -> Nothing
+        _ -> Nothing
+  where
+    splitDate :: String -> [String]
+    splitDate [] = []
+    splitDate s@(c:cs)
+        | c == '-' = splitDate cs
+        | otherwise = let (part, rest) = break (== '-') s
+                      in part : splitDate rest
+
+
+readMaybe :: Read a => String -> Maybe a
+readMaybe str = case reads str of
+    [(x, "")] -> Just x
+    _         -> Nothing
+
 generateTaskId :: TaskList -> Int
-generateTaskId [] = 1                                    -- Si la lista de tareas está vacía, el ID es 1
-generateTaskId tasks = maximum (map taskId tasks) + 1    -- Si no, el ID es el máximo ID existente más 1
+generateTaskId [] = 1
+generateTaskId tasks = maximum (map taskId tasks) + 1
 
--- Función para eliminar una tarea
 deleteTask :: TaskList -> IO ()
 deleteTask tasks = do
-    putStrLn "Enter task ID to delete: "                 -- Solicita el ID de la tarea a eliminar
-    idStr <- getLine                                     -- Lee el ID
-    case reads idStr :: [(Int, String)] of               -- Intenta convertir la entrada a un número
-        [(taskIdToDelete, "")] -> do                     -- Si la conversión es exitosa:
-            let taskExists = any (\task -> taskId task == taskIdToDelete) tasks -- Verifica si la tarea existe
+    putStrLn "Enter task ID to delete:"
+    idStr <- getLine
+    case reads idStr :: [(Int, String)] of
+        [(taskIdToDelete, "")] -> do
+            let taskExists = any (\task -> taskId task == taskIdToDelete) tasks
             if taskExists
                 then do
-                    let updatedTasks = filter (\task -> taskId task /= taskIdToDelete) tasks -- Filtra la tarea a eliminar
-                    putStrLn "Task deleted successfully." -- Informa que la tarea fue eliminada
-                    mainMenu updatedTasks                -- Vuelve al menú principal con la lista actualizada
+                    let updatedTasks = filter (\task -> taskId task /= taskIdToDelete) tasks
+                    putStrLn "Task deleted successfully."
+                    mainMenu updatedTasks
                 else do
-                    putStrLn "Task not found."           -- Informa que no se encontró la tarea
-                    mainMenu tasks                       -- Vuelve al menú principal
-        _ -> do                                          -- Si la conversión falla:
+                    putStrLn "Task not found."
+                    mainMenu tasks
+        _ -> do
             putStrLn "Invalid task ID. Please enter a valid number."
-            deleteTask tasks                             -- Solicita nuevamente el ID
+            deleteTask tasks
 
--- Función para listar todas las tareas
 listTasks :: TaskList -> IO ()
 listTasks tasks = do
-    putStrLn "\nYour Tasks:"                             -- Imprime el encabezado de la lista de tareas
-    mapM_ printTask tasks                                -- Imprime cada tarea
-    mainMenu tasks                                       -- Vuelve al menú principal
+    putStrLn "\nYour Tasks:"
+    mapM_ printTask tasks
+    mainMenu tasks
 
--- Función para imprimir una tarea
 printTask :: Task -> IO ()
-printTask task = putStrLn $ show (taskId task) ++ ". " ++ description task ++ " [" ++ show (priority task) ++ "]"
-    -- Imprime la tarea en el formato: "ID. Descripción [Prioridad]"
+printTask task = putStrLn $ show (taskId task) ++ ". " ++ description task ++ " [" ++ show (priority task) ++ "]" ++ dueDateStr
+    where
+        dueDateStr = case dueDate task of
+            Just (year, month, day) -> " Due: " ++ show year ++ "-" ++ show month ++ "-" ++ show day
+            Nothing -> ""
 
--- Función para verificar si un archivo existe
 doesFileExist :: FilePath -> IO Bool
 doesFileExist path = do
     result <- try (withFile path ReadMode (\_ -> return ())) :: IO (Either SomeException ())
-    -- Intenta abrir el archivo en modo lectura
     case result of
-        Left _ -> return False -- Si hay una excepción, el archivo no existe
-        Right _ -> return True -- Si no hay excepción, el archivo existe
+        Left _ -> return False
+        Right _ -> return True
 
--- Función para leer un archivo de manera segura
 readFileSafe :: FilePath -> IO (Either SomeException String)
-readFileSafe path = try (readFile path) -- Intenta leer el archivo y maneja posibles excepciones
+readFileSafe path = try (readFile path)
 
--- Función para escribir un archivo de manera segura
 writeFileSafe :: FilePath -> String -> IO (Either SomeException ())
-writeFileSafe path content = try (writeFile path content) -- Intenta escribir el archivo y maneja posibles excepciones
+writeFileSafe path content = try (writeFile path content)
 
--- Función para cargar las tareas desde un archivo
 loadTasks :: IO TaskList
 loadTasks = do
-    fileExists <- doesFileExist "tasks.txt" -- Verifica si el archivo "tasks.txt" existe
+    fileExists <- doesFileExist "tasks.txt"
     if fileExists
         then do
-            result <- readFileSafe "tasks.txt" -- Intenta leer el archivo
+            result <- readFileSafe "tasks.txt"
             case result of
-                Left ex -> do -- Si hay una excepción al leer el archivo:
+                Left ex -> do
                     putStrLn $ "Error reading tasks: " ++ show ex
-                    return [] -- Devuelve una lista vacía
+                    return []
                 Right contents ->
                     if null contents
-                        then return [] -- Si el archivo está vacío, devuelve una lista vacía
+                        then return []
                         else case reads contents :: [(TaskList, String)] of
-                            [(tasks, "")] -> return tasks -- Si la lectura es exitosa, devuelve la lista de tareas
+                            [(tasks, "")] -> return tasks
                             _ -> do
                                 putStrLn "Error: Invalid format in tasks.txt"
-                                return [] -- Si el formato es inválido, devuelve una lista vacía
-        else return [] -- Si el archivo no existe, devuelve una lista vacía
+                                return []
+        else return []
 
--- Función para guardar las tareas en un archivo
 saveTasks :: TaskList -> IO ()
 saveTasks tasks = do
-    result <- writeFileSafe "tasks.txt" (show tasks) -- Intenta escribir la lista de tareas en el archivo
+    result <- writeFileSafe "tasks.txt" (show tasks)
     case result of
-        Left ex -> putStrLn $ "Error saving tasks: " ++ show ex -- Si hay una excepción, imprime un mensaje de error
-        Right _ -> putStrLn "Tasks saved. Goodbye!" -- Si la escritura es exitosa, informa que las tareas fueron guardadas
+        Left ex -> putStrLn $ "Error saving tasks: " ++ show ex
+        Right _ -> putStrLn "Tasks saved. Goodbye!"
 
--- Función principal
 main :: IO ()
 main = do
-    tasks <- loadTasks -- Carga las tareas desde el archivo
-    putStrLn "Welcome to the Haskell To-Do List Manager" -- Imprime un mensaje de bienvenida
-    mainMenu tasks -- Muestra el menú principal
+    tasks <- loadTasks
+    putStrLn "Welcome to the Haskell To-Do List Manager"
+    mainMenu tasks
