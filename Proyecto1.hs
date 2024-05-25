@@ -102,123 +102,98 @@ getDueDate = do
             getDueDate                        -- Llama recursivamente a getDueDate para solicitar nuevamente al usuario que ingrese la fecha de vencimiento
 
 
--- Definimos una función llamada parseDate que analiza una cadena de texto para extraer una fecha en formato YYYY-MM-DD y devuelve Just (year, month, day) si la cadena es válida o Nothing si no lo es
+-- Definimos una función llamada parseDate que analiza una cadena de texto para extraer una fecha en formato YYYY-MM-DD 
+-- y devuelve Just (year, month, day) si la cadena es válida o Nothing si no lo es
 parseDate :: String -> Maybe (Int, Int, Int)
 parseDate str =
-    case splitDate str of                         -- Llama a la función splitDate para dividir la cadena en partes (año, mes, día)
-        [yearStr, monthStr, dayStr] ->           -- Si splitDate devuelve una lista con tres elementos (año, mes, día):
-            case (readMaybe yearStr, readMaybe monthStr, readMaybe dayStr) of  -- Intenta convertir cada parte de la fecha en un entero
-                (Just year, Just month, Just day) -> Just (year, month, day)  -- Si todas las conversiones son exitosas, devuelve Just (year, month, day)
-                _ -> Nothing                        -- Si alguna conversión falla, devuelve Nothing
-        _ -> Nothing                               -- Si splitDate no devuelve una lista con tres elementos, devuelve Nothing
+    -- Llama a la función splitDate para dividir la cadena en partes (año, mes, día)
+    case splitDate str of
+        -- Si splitDate devuelve una lista con tres elementos (año, mes, día):
+        [yearStr, monthStr, dayStr] ->
+            -- Intenta convertir cada parte de la fecha en un entero usando readMaybe
+            case (readMaybe yearStr, readMaybe monthStr, readMaybe dayStr) of
+                -- Si todas las conversiones son exitosas, devuelve Just (year, month, day)
+                (Just year, Just month, Just day) -> Just (year, month, day)
+                -- Si alguna conversión falla, devuelve Nothing
+                _ -> Nothing
+        -- Si splitDate no devuelve una lista con tres elementos, devuelve Nothing
+        _ -> Nothing
   where
     -- Definimos una función interna llamada splitDate que divide una cadena en partes usando el guion '-' como delimitador
     splitDate :: String -> [String]
-    splitDate [] = []                                          -- Caso base: si la cadena está vacía, devuelve una lista vacía
+    -- Caso base: si la cadena está vacía, devuelve una lista vacía
+    splitDate [] = []
     splitDate s@(c:cs)
-        | c == '-' = splitDate cs                              -- Si el primer carácter es '-', ignóralo y llama recursivamente a splitDate con el resto de la cadena
-        | otherwise = let (part, rest) = break (== '-') s      -- Si el primer carácter no es '-', divide la cadena en dos partes en el primer '-'
-                      in part : splitDate rest                 -- Agrega la parte dividida a la lista y llama recursivamente a splitDate con el resto de la cadena
+        -- Si el primer carácter es un guion, llama recursivamente a splitDate con el resto de la cadena
+        | c == '-' = splitDate cs
+        -- Si el primer carácter no es un guion, usa break para dividir la cadena en dos partes: antes y después del primer guion encontrado
+        | otherwise = let (token, rest) = break (== '-') s in
+                          -- Devuelve una lista con la primera parte (token) y llama recursivamente a splitDate con la segunda parte (rest)
+                          token : splitDate rest
 
--- La función readMaybe intenta analizar una cadena de texto en un valor de algún tipo que implementa la clase Read. Si el análisis es exitoso, devuelve Just x, donde x es el valor analizado. De lo contrario, devuelve Nothing.
+-- La función readMaybe intenta convertir una cadena de texto en un valor de un tipo que implemente la clase de tipos Read
+-- y devuelve Just valor si la conversión es exitosa o Nothing si no lo es
 readMaybe :: Read a => String -> Maybe a
-readMaybe str = case reads str of       -- Intenta analizar la cadena de texto usando la función reads
-    [(x, "")] -> Just x                 -- Si el análisis es exitoso (devuelve una lista con un solo elemento y una cadena vacía), devuelve Just x
-    _         -> Nothing                 -- Si el análisis falla (devuelve cualquier otra cosa), devuelve Nothing
+readMaybe s = case reads s of
+    -- Si reads devuelve una lista con un solo par (valor, cadena vacía), devuelve Just valor
+    [(val, "")] -> Just val
+    -- Si reads devuelve cualquier otra cosa, devuelve Nothing
+    _ -> Nothing
 
--- La función generateTaskId genera un nuevo ID para una tarea basado en la lista de tareas existente. Si la lista está vacía, devuelve 1. Si no, devuelve el máximo ID existente más 1.
+-- Definimos una función llamada generateTaskId que genera un nuevo ID de tarea basado en la lista de tareas actual
 generateTaskId :: TaskList -> Int
-generateTaskId [] = 1                                                    -- Si la lista de tareas está vacía, el ID de la nueva tarea será 1
-generateTaskId tasks = maximum (map taskId tasks) + 1                    -- Si hay tareas en la lista, el ID de la nueva tarea será el máximo ID existente más 1
+generateTaskId tasks = if null tasks then 1 else (maximum (map taskId tasks) + 1)
+-- Si la lista de tareas está vacía, devuelve 1 como el nuevo ID
+-- Si la lista de tareas no está vacía, encuentra el ID máximo en la lista y devuelve ese ID incrementado en 1
 
--- La función deleteTask permite al usuario eliminar una tarea de la lista de tareas.
+
+-- Definimos una función llamada deleteTask que permite al usuario eliminar una tarea de la lista
 deleteTask :: TaskList -> IO ()
 deleteTask tasks = do
-    putStrLn "Enter task ID to delete:"         -- Solicita al usuario que ingrese el ID de la tarea a eliminar
-    idStr <- getLine                            -- Lee el ID ingresado por el usuario como una cadena de texto
-    case reads idStr :: [(Int, String)] of      -- Intenta convertir la cadena de texto a un entero utilizando reads
-        [(taskIdToDelete, "")] -> do           -- Si la conversión es exitosa (devuelve una lista con un solo elemento y una cadena vacía):
-            let taskExists = any (\task -> taskId task == taskIdToDelete) tasks  -- Verifica si la tarea con el ID especificado existe en la lista de tareas
-            if taskExists                        -- Si la tarea existe:
-                then do
-                    let updatedTasks = filter (\task -> taskId task /= taskIdToDelete) tasks  -- Filtra la lista de tareas para eliminar la tarea con el ID especificado
-                    putStrLn "Task deleted successfully."  -- Informa al usuario que la tarea ha sido eliminada con éxito
-                    mainMenu updatedTasks          -- Vuelve al menú principal con la lista de tareas actualizada
-                else do
-                    putStrLn "Task not found."     -- Informa al usuario que la tarea no fue encontrada en la lista
-                    mainMenu tasks                 -- Vuelve al menú principal con la lista de tareas original
-        _ -> do                                  -- Si la conversión falla:
-            putStrLn "Invalid task ID. Please enter a valid number."  -- Informa al usuario que el ID de la tarea ingresado no es válido
-            deleteTask tasks                     -- Vuelve a solicitar al usuario que ingrese el ID de la tarea para eliminarla
+    putStrLn "Enter the task ID to delete:"  -- Solicita al usuario que ingrese el ID de la tarea a eliminar
+    idStr <- getLine                          -- Lee el ID ingresado por el usuario
+    case readMaybe idStr of                   -- Intenta convertir el ID ingresado en un entero
+        Just id -> do
+            let filteredTasks = filter ((/= id) . taskId) tasks  -- Filtra la lista de tareas para eliminar la tarea con el ID especificado
+            putStrLn "Task deleted successfully." -- Imprime un mensaje indicando que la tarea ha sido eliminada con éxito
+            mainMenu filteredTasks            -- Retorna al menú principal con la lista actualizada de tareas
+        Nothing -> do
+            putStrLn "Invalid task ID. Please enter a valid number."  -- Si el ID ingresado no es válido, imprime un mensaje de error
+            deleteTask tasks                  -- Llama recursivamente a deleteTask para solicitar nuevamente al usuario que ingrese el ID de la tarea a eliminar
 
 
--- La función listTasks muestra todas las tareas de la lista de tareas y luego vuelve al menú principal.
+-- Definimos una función llamada listTasks que imprime todas las tareas de la lista
 listTasks :: TaskList -> IO ()
 listTasks tasks = do
-    putStrLn "\nYour Tasks:"       -- Imprime el encabezado para mostrar las tareas
-    mapM_ printTask tasks          -- Mapea la función printTask sobre todas las tareas y las imprime
-    mainMenu tasks                 -- Vuelve al menú principal
+    mapM_ printTask tasks  -- Itera sobre la lista de tareas y llama a printTask para imprimir cada tarea
+    mainMenu tasks         -- Retorna al menú principal
 
--- La función printTask imprime los detalles de una tarea, incluido su ID, descripción, prioridad y fecha de vencimiento si está definida.
+-- Definimos una función llamada printTask que imprime una tarea
 printTask :: Task -> IO ()
-printTask task = putStrLn $ show (taskId task) ++ ". " ++ description task ++ " [" ++ show (priority task) ++ "]" ++ dueDateStr
-    where
-        dueDateStr = case dueDate task of                   -- Verifica si la tarea tiene una fecha de vencimiento definida
-            Just (year, month, day) -> " Due: " ++ show year ++ "-" ++ show month ++ "-" ++ show day  -- Si hay una fecha de vencimiento, la muestra
-            Nothing -> ""                                 -- Si no hay una fecha de vencimiento, muestra una cadena vacía
+printTask task = putStrLn $ show task -- Convierte la tarea en una cadena de texto usando show y la imprime
 
--- La función doesFileExist verifica si un archivo existe en la ruta especificada.
-doesFileExist :: FilePath -> IO Bool
-doesFileExist path = do
-    result <- try (withFile path ReadMode (\_ -> return ())) :: IO (Either SomeException ())  -- Intenta abrir el archivo en modo lectura
-    case result of
-        Left _ -> return False          -- Si ocurre una excepción al abrir el archivo, significa que el archivo no existe, por lo que devuelve False
-        Right _ -> return True           -- Si no hay excepción al abrir el archivo, significa que el archivo existe, por lo que devuelve True
 
--- La función readFileSafe intenta leer un archivo de manera segura, manejando cualquier excepción que pueda ocurrir durante la lectura.
-readFileSafe :: FilePath -> IO (Either SomeException String)
-readFileSafe path = try (readFile path)  -- Intenta leer el contenido del archivo en la ruta especificada
-                                        -- Si ocurre una excepción durante la lectura, se manejará y se devolverá como una instancia de SomeException
-                                        -- Si la lectura es exitosa, se devuelve el contenido del archivo como una cadena
-
--- La función writeFileSafe intenta escribir en un archivo de manera segura, manejando cualquier excepción que pueda ocurrir durante la escritura.
-writeFileSafe :: FilePath -> String -> IO (Either SomeException ())
-writeFileSafe path content = try (writeFile path content)  -- Intenta escribir el contenido en el archivo en la ruta especificada
-                                                         -- Si ocurre una excepción durante la escritura, se manejará y se devolverá como una instancia de SomeException
-                                                         -- Si la escritura es exitosa, se devuelve () para indicar que se completó correctamente
--- La función loadTasks carga las tareas desde un archivo "tasks.txt" y devuelve una lista de tareas.
-loadTasks :: IO TaskList
-loadTasks = do
-    fileExists <- doesFileExist "tasks.txt"  -- Verifica si el archivo "tasks.txt" existe
-    if fileExists                            -- Si el archivo existe:
-        then do
-            result <- readFileSafe "tasks.txt"  -- Intenta leer el contenido del archivo de manera segura
-            case result of
-                Left ex -> do                     -- Si hay una excepción al leer el archivo:
-                    putStrLn $ "Error reading tasks: " ++ show ex  -- Imprime un mensaje de error
-                    return []                     -- Devuelve una lista vacía de tareas
-                Right contents ->                -- Si la lectura es exitosa:
-                    if null contents             -- Si el contenido del archivo está vacío:
-                        then return []           -- Devuelve una lista vacía de tareas
-                        else case reads contents :: [(TaskList, String)] of  -- Intenta analizar el contenido del archivo en una lista de tareas
-                            [(tasks, "")] -> return tasks    -- Si el análisis es exitoso y no hay caracteres sobrantes después de la lista de tareas, devuelve la lista de tareas
-                            _ -> do                         -- Si el análisis falla o hay caracteres sobrantes después de la lista de tareas:
-                                putStrLn "Error: Invalid format in tasks.txt"  -- Imprime un mensaje de error
-                                return []                     -- Devuelve una lista vacía de tareas
-        else return []                      -- Si el archivo no existe, devuelve una lista vacía de tareas
-
--- La función saveTasks guarda la lista de tareas en un archivo "tasks.txt".
+-- Definimos una función llamada saveTasks que guarda la lista de tareas en un archivo llamado "tasks.txt"
 saveTasks :: TaskList -> IO ()
 saveTasks tasks = do
-    result <- writeFileSafe "tasks.txt" (show tasks)  -- Intenta escribir la lista de tareas en el archivo de manera segura
-    case result of                                   -- Maneja el resultado de la operación de escritura
-        Left ex -> putStrLn $ "Error saving tasks: " ++ show ex  -- Si hay una excepción durante la escritura, imprime un mensaje de error
-        Right _ -> putStrLn "Tasks saved. Goodbye!"               -- Si la escritura es exitosa, imprime un mensaje indicando que las tareas fueron guardadas
+    handle <- openFile "tasks.txt" WriteMode  -- Abre el archivo "tasks.txt" en modo de escritura
+    hPrint handle tasks                       -- Escribe la lista de tareas en el archivo
+    hClose handle                             -- Cierra el archivo
+    putStrLn "Tasks saved. Goodbye!"          -- Imprime un mensaje indicando que las tareas han sido guardadas y el programa va a finalizar
 
--- La función principal del programa.
+
+-- Definimos una función llamada loadTasks que carga la lista de tareas desde un archivo llamado "tasks.txt"
+loadTasks :: IO TaskList
+loadTasks = do
+    result <- try (readFile "tasks.txt") :: IO (Either SomeException String)
+    case result of
+        Right content -> return (read content)  -- Si la lectura del archivo es exitosa, convierte el contenido del archivo en una lista de tareas y la devuelve
+        Left _ -> return []                     -- Si ocurre un error al leer el archivo, devuelve una lista vacía de tareas
+
+
+-- Función principal del programa
 main :: IO ()
 main = do
-    tasks <- loadTasks                            -- Carga las tareas desde el archivo "tasks.txt"
-    putStrLn "Welcome to the Haskell To-Do List Manager"  -- Imprime un mensaje de bienvenida
-    mainMenu tasks                               -- Llama a la función mainMenu para mostrar el menú principal, pasando la lista de tareas cargadas
+    tasks <- loadTasks  -- Carga la lista de tareas desde el archivo "tasks.txt"
+    mainMenu tasks      -- Llama al menú principal con la lista de tareas cargada
 
